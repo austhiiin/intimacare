@@ -23,7 +23,7 @@ class _ProfilePageState extends State<ProfilePage> {
     'Divorced',
     'Widowed',
     'Separated',
-    'Prefer not to say'
+    'Prefer not to say',
   ];
 
   @override
@@ -46,12 +46,13 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final user = _supabaseClient.auth.currentUser;
       if (user != null) {
-        final response = await _supabaseClient
-            .from('patient')
-            .select()
-            .eq('patient_id', user.id)
-            .single();
-            
+        final response =
+            await _supabaseClient
+                .from('patient')
+                .select()
+                .eq('patient_id', user.id)
+                .single();
+
         if (response != null) {
           setState(() {
             _patientData = response;
@@ -62,13 +63,17 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading profile: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -90,19 +95,18 @@ class _ProfilePageState extends State<ProfilePage> {
             .from('patient')
             .update(_updatedData)
             .eq('patient_id', user.id);
-            
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Profile updated successfully')),
           );
-          Navigator.pop(context, true); // Return true to indicate profile was updated
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
       }
     } finally {
       if (mounted) {
@@ -116,13 +120,14 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)), // Default to 18 years ago
+      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
       builder: (context, child) {
         return Theme(
-          data: ThemeData.light().copyWith(
+          data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(primary: Colors.red),
+            dialogBackgroundColor: Colors.white,
           ),
           child: child!,
         );
@@ -131,391 +136,536 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (picked != null) {
       setState(() {
-        _birthdayController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+        _birthdayController.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
         _updatedData['birthday'] = _birthdayController.text;
       });
     }
   }
 
-  bool _isProfileComplete() {
-    // Check all required fields
-    final requiredFields = [
-      'birthday',
-      'place_of_birth',
-      'house_number',
-      'street',
-      'barangay',
-      'city',
-      'province',
-      'zip_code',
-      'contact_number',
-      'civil_status',
-    ];
-
-    for (var field in requiredFields) {
-      if (_patientData[field] == null || _patientData[field].toString().isEmpty) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Profile',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.red,
-        iconTheme: const IconThemeData(color: Colors.white),
+      backgroundColor: const Color.fromARGB(255, 245, 245, 245),
+      body: SafeArea(
+        child:
+            _isLoading
+                ? const Center(
+                  child: CircularProgressIndicator(color: Colors.red),
+                )
+                : SingleChildScrollView(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(context), // Pass context to header
+                        _buildProfileImage(),
+                        _buildPersonalInfoForm(),
+                        _buildContactInfoForm(),
+                        _buildAddressInfoForm(),
+                        const SizedBox(height: 20),
+                        _buildSaveButton(),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Personal Information',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Name section (read-only since it's filled during registration)
-                    TextFormField(
-                      initialValue: _patientData['first_name'] ?? '',
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'First Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    TextFormField(
-                      initialValue: _patientData['middle_name'] ?? '',
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Middle Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    TextFormField(
-                      initialValue: _patientData['last_name'] ?? '',
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Last Name',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    TextFormField(
-                      initialValue: _patientData['suffix'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Suffix',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['suffix'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
+    );
+  }
 
-                    // Birthday field with date picker
-                    TextFormField(
-                      controller: _birthdayController,
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        labelText: 'Birthday',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.calendar_today),
-                          onPressed: _selectDate,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select your birthday';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Place of birth
-                    TextFormField(
-                      initialValue: _patientData['place_of_birth'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Place of Birth',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your place of birth';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['place_of_birth'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Civil status dropdown
-                    DropdownButtonFormField<String>(
-                      value: _patientData['civil_status'],
-                      decoration: const InputDecoration(
-                        labelText: 'Civil Status',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: _civilStatusOptions.map((String status) {
-                        return DropdownMenuItem<String>(
-                          value: status,
-                          child: Text(status),
-                        );
-                      }).toList(),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select your civil status';
-                        }
-                        return null;
-                      },
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _updatedData['civil_status'] = newValue;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      'Contact Information',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Contact number
-                    TextFormField(
-                      initialValue: _patientData['contact_number'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Contact Number',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.phone,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your contact number';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['contact_number'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Email (read-only)
-                    TextFormField(
-                      initialValue: _patientData['email'] ?? '',
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    const Text(
-                      'Address Information',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // House number
-                    TextFormField(
-                      initialValue: _patientData['house_number'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'House Number',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your house number';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['house_number'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Street
-                    TextFormField(
-                      initialValue: _patientData['street'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Street',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your street';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['street'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Barangay
-                    TextFormField(
-                      initialValue: _patientData['barangay'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Barangay',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your barangay';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['barangay'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // City
-                    TextFormField(
-                      initialValue: _patientData['city'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'City',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your city';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['city'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Province
-                    TextFormField(
-                      initialValue: _patientData['province'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Province',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your province';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['province'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Zip Code
-                    TextFormField(
-                      initialValue: _patientData['zip_code'] ?? '',
-                      decoration: const InputDecoration(
-                        labelText: 'Zip Code',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your zip code';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          _updatedData['zip_code'] = value;
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _updateProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Save Profile',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () {
+              Navigator.of(context).pop(); // Use Navigator.of(context)
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.red, width: 2),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: const Icon(Icons.arrow_back, color: Colors.red, size: 20),
+            ),
+          ),
+          const SizedBox(width: 15),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'IntimaCare',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: Color.fromARGB(255, 197, 0, 0),
                 ),
               ),
+              const SizedBox(height: 2),
+              Text(
+                'Edit Profile',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileImage() {
+    return Center(
+      child: Column(
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.red,
             ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/${_patientData['sex'] ?? 'female'}.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfoForm() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Personal Information',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // First Name (read-only)
+          _buildTextField(
+            'First Name',
+            initialValue: _patientData['first_name'] ?? '',
+            readOnly: true,
+          ),
+
+          // Middle Name (read-only)
+          _buildTextField(
+            'Middle Name',
+            initialValue: _patientData['middle_name'] ?? '',
+            readOnly: true,
+          ),
+
+          // Last Name (read-only)
+          _buildTextField(
+            'Last Name',
+            initialValue: _patientData['last_name'] ?? '',
+            readOnly: true,
+          ),
+
+          // Suffix
+          _buildTextField(
+            'Suffix',
+            initialValue: _patientData['suffix'] ?? '',
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['suffix'] = value;
+              }
+            },
+          ),
+
+          // Sex (read-only)
+          _buildTextField(
+            'Sex',
+            initialValue: _patientData['sex']?.toString().toUpperCase() ?? '',
+            readOnly: true,
+          ),
+
+          // Birthday
+          InkWell(
+            onTap: _selectDate,
+            child: IgnorePointer(
+              child: _buildTextField(
+                'Birthday',
+                controller: _birthdayController,
+                isDate: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select your birthday';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ),
+
+          // Place of Birth
+          _buildTextField(
+            'Place of Birth',
+            initialValue: _patientData['place_of_birth'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your place of birth';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['place_of_birth'] = value;
+              }
+            },
+          ),
+
+          // Civil Status Dropdown
+          _buildDropdownField(
+            'Civil Status',
+            value: _patientData['civil_status'],
+            items: _civilStatusOptions,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please select your civil status';
+              }
+              return null;
+            },
+            onChanged: (String? newValue) {
+              if (newValue != null) {
+                setState(() {
+                  _updatedData['civil_status'] = newValue;
+                });
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactInfoForm() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Contact Information',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Contact Number
+          _buildTextField(
+            'Contact Number',
+            initialValue: _patientData['contact_number'] ?? '',
+            keyboardType: TextInputType.phone,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your contact number';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['contact_number'] = value;
+              }
+            },
+          ),
+
+          // Email (read-only)
+          _buildTextField(
+            'Email',
+            initialValue: _patientData['email'] ?? '',
+            readOnly: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressInfoForm() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Address Information',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // House Number
+          _buildTextField(
+            'House Number',
+            initialValue: _patientData['house_number'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your house number';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['house_number'] = value;
+              }
+            },
+          ),
+
+          // Street
+          _buildTextField(
+            'Street',
+            initialValue: _patientData['street'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your street';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['street'] = value;
+              }
+            },
+          ),
+
+          // Barangay
+          _buildTextField(
+            'Barangay',
+            initialValue: _patientData['barangay'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your barangay';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['barangay'] = value;
+              }
+            },
+          ),
+
+          // City
+          _buildTextField(
+            'City',
+            initialValue: _patientData['city'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your city';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['city'] = value;
+              }
+            },
+          ),
+
+          // Province
+          _buildTextField(
+            'Province',
+            initialValue: _patientData['province'] ?? '',
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your province';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['province'] = value;
+              }
+            },
+          ),
+
+          // Zip Code
+          _buildTextField(
+            'Zip Code',
+            initialValue: _patientData['zip_code'] ?? '',
+            keyboardType: TextInputType.number,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your zip code';
+              }
+              return null;
+            },
+            onSaved: (value) {
+              if (value != null && value.isNotEmpty) {
+                _updatedData['zip_code'] = value;
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+    String label, {
+    String? initialValue,
+    TextEditingController? controller,
+    bool readOnly = false,
+    bool isDate = false,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+    void Function(String?)? onSaved,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controller,
+            initialValue: initialValue,
+            readOnly: readOnly || isDate,
+            keyboardType: keyboardType,
+            validator: validator,
+            onSaved: onSaved,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              suffixIcon:
+                  isDate
+                      ? const Icon(Icons.calendar_today, color: Colors.grey)
+                      : null,
+              errorStyle: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(
+    String label, {
+    String? value,
+    required List<String> items,
+    String? Function(String?)? validator,
+    void Function(String?)? onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonFormField<String>(
+              value: value,
+              validator: validator,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 5,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                errorStyle: const TextStyle(color: Colors.red),
+              ),
+              items:
+                  items.map((String item) {
+                    return DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(item),
+                    );
+                  }).toList(),
+              dropdownColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _updateProfile,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child:
+            _isLoading
+                ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  'Save Changes',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+      ),
     );
   }
 }
@@ -524,24 +674,25 @@ class _ProfilePageState extends State<ProfilePage> {
 Future<bool> checkProfileCompletion(BuildContext context) async {
   final supabaseClient = Supabase.instance.client;
   final user = supabaseClient.auth.currentUser;
-  
+
   if (user == null) {
     // User is not logged in, redirect to login
     Navigator.pushReplacementNamed(context, '/login');
     return false;
   }
-  
+
   try {
-    final response = await supabaseClient
-        .from('patient')
-        .select()
-        .eq('patient_id', user.id)
-        .single();
-        
+    final response =
+        await supabaseClient
+            .from('patient')
+            .select()
+            .eq('patient_id', user.id)
+            .single();
+
     if (response == null) {
       return false;
     }
-    
+
     // Check all required fields
     final requiredFields = [
       'birthday',
@@ -575,10 +726,15 @@ Future<bool> checkProfileCompletion(BuildContext context) async {
                     Navigator.pop(context); // Close dialog
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const ProfilePage()),
+                      MaterialPageRoute(
+                        builder: (context) => const ProfilePage(),
+                      ),
                     );
                   },
-                  child: const Text('Complete Profile', style: TextStyle(color: Colors.white)),
+                  child: const Text(
+                    'Complete Profile',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
               shape: RoundedRectangleBorder(
@@ -592,9 +748,9 @@ Future<bool> checkProfileCompletion(BuildContext context) async {
     }
     return true;
   } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error checking profile: $e')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Error checking profile: $e')));
     return false;
   }
 }

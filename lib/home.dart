@@ -13,6 +13,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _userName = 'Patient';
+  String _userSex = 'female';
   bool _isLoading = true;
 
   @override
@@ -29,16 +30,16 @@ class _HomePageState extends State<HomePage> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
-        final response =
-            await Supabase.instance.client
-                .from('patient')
-                .select('first_name')
-                .eq('patient_id', user.id)
-                .single();
+        final response = await Supabase.instance.client
+            .from('patient')
+            .select('first_name, sex')
+            .eq('patient_id', user.id)
+            .single();
 
-        if (response != null && response['first_name'] != null) {
+        if (response != null) {
           setState(() {
-            _userName = response['first_name'];
+            _userName = response['first_name'] ?? 'Patient';
+            _userSex = response['sex']?.toLowerCase() ?? 'female';
           });
         }
       }
@@ -58,20 +59,14 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // App bar with logo and profile menu
             _buildAppBar(),
-
-            // Main content
             Expanded(
-              child:
-                  _isLoading
-                      ? const Center(
-                        child: CircularProgressIndicator(color: Colors.red),
-                      )
-                      : _buildMainContent(),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.red),
+                    )
+                  : _buildMainContent(),
             ),
-
-            // Bottom navigation
             _buildBottomNavigation(),
           ],
         ),
@@ -106,7 +101,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          const ProfileIconWithDropdown(),
+          ProfileIconWithDropdown(userSex: _userSex),
         ],
       ),
     );
@@ -118,7 +113,6 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Greeting with user's name
           Text(
             'Hello, $_userName!',
             style: const TextStyle(
@@ -128,20 +122,11 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Clinic info card
           _buildClinicInfoCard(),
-
           const SizedBox(height: 30),
-
-          // FAQ section
           _buildFaqSection(),
-
           const SizedBox(height: 30),
-
-          // Get tested button
           _buildGetTestedButton(),
-
           const SizedBox(height: 20),
         ],
       ),
@@ -306,7 +291,7 @@ class _HomePageState extends State<HomePage> {
           onPressed: () async {
             final isComplete = await checkProfileCompletion(context);
             if (isComplete) {
-              Navigator.pushNamed(context, '/create_appointment');
+              Navigator.pushNamed(context, '/appointment');
             }
           },
           style: ElevatedButton.styleFrom(
@@ -336,6 +321,124 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<bool> checkProfileCompletion(BuildContext context) async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please login to continue')),
+        );
+        return false;
+      }
+
+      final response = await Supabase.instance.client
+          .from('patient')
+          .select()
+          .eq('patient_id', user.id)
+          .single();
+
+      final requiredFields = [
+        'first_name',
+        'last_name',
+        'birthday',
+        'sex',
+        'civil_status',
+        'place_of_birth',
+      ];
+
+      bool hasIncompleteField = false;
+      String missingField = '';
+
+      for (final field in requiredFields) {
+        if (response[field] == null || response[field].toString().isEmpty) {
+          hasIncompleteField = true;
+          missingField = field.replaceAll('_', ' ');
+          break;
+        }
+      }
+
+      if (hasIncompleteField) {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Complete Your Profile'),
+              content: Text(
+                'Please complete your profile information before scheduling an appointment. Missing: ${missingField.toUpperCase()}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfilePage(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text(
+                    'Go to Profile',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            );
+          },
+        );
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking profile completion: $e');
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Profile Not Found'),
+            content: const Text(
+              'Please complete your profile information before scheduling an appointment.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfilePage(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text(
+                  'Go to Profile',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          );
+        },
+      );
+      return false;
+    }
+  }
+
   Widget _buildBottomNavigation() {
     return Container(
       height: 65,
@@ -356,25 +459,18 @@ class _HomePageState extends State<HomePage> {
           _buildNavItem(
             Icons.calendar_today,
             'Appointment',
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/appointment');
-            },
+            onTap: () => Navigator.pushReplacementNamed(context, '/appointment'),
           ),
           _buildNavItem(
             Icons.home,
             'Home',
             isSelected: true,
-            onTap: () {
-              // Already on home page, could refresh if needed
-              _loadUserData();
-            },
+            onTap: _loadUserData,
           ),
           _buildNavItem(
             Icons.description,
             'Prescription',
-            onTap: () {
-              Navigator.pushReplacementNamed(context, '/prescription');
-            },
+            onTap: () => Navigator.pushReplacementNamed(context, '/prescription'),
           ),
         ],
       ),
@@ -415,7 +511,12 @@ class _HomePageState extends State<HomePage> {
 }
 
 class ProfileIconWithDropdown extends StatelessWidget {
-  const ProfileIconWithDropdown({super.key});
+  final String userSex;
+
+  const ProfileIconWithDropdown({
+    super.key,
+    required this.userSex,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -429,52 +530,70 @@ class ProfileIconWithDropdown extends StatelessWidget {
           color: Colors.red.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.person_outline, color: Colors.red),
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/$userSex.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: Icon(
+                  Icons.person_outline,
+                  size: 20,
+                  color: Colors.red,
+                ),
+              );
+            },
+          ),
+        ),
       ),
-      itemBuilder:
-          (BuildContext context) => <PopupMenuEntry<String>>[
-            const PopupMenuItem<String>(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline, color: Colors.red),
-                  SizedBox(width: 10),
-                  Text('My Profile'),
-                ],
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'profile',
+          child: Row(
+            children: [
+              Container(
+                height: 24,
+                width: 24,
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/$userSex.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.person_outline,
+                        size: 16,
+                        color: Colors.red,
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'settings',
-              child: Row(
-                children: [
-                  Icon(Icons.settings, color: Colors.red),
-                  SizedBox(width: 10),
-                  Text('Settings'),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem<String>(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.red),
-                  SizedBox(width: 10),
-                  Text('Logout'),
-                ],
-              ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              const Text('My Profile'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 10),
+              Text('Logout'),
+            ],
+          ),
+        ),
+      ],
       onSelected: (String value) {
         if (value == 'profile') {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ProfilePage()),
-          );
-        } else if (value == 'settings') {
-          // TODO: Implement settings page navigation
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Settings page coming soon')),
           );
         } else if (value == 'logout') {
           _showLogoutConfirmationDialog(context);
@@ -492,16 +611,12 @@ class ProfileIconWithDropdown extends StatelessWidget {
           content: const Text('Are you sure you want to logout?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+              onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop();
-
-                // Show loading indicator
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -511,24 +626,15 @@ class ProfileIconWithDropdown extends StatelessWidget {
                     );
                   },
                 );
-
                 try {
-                  // Sign out user
                   await Supabase.instance.client.auth.signOut();
-
-                  // Remove loading indicator
                   Navigator.of(context).pop();
-
-                  // Navigate to login page
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     '/login',
-                    (route) => false, // Remove all routes from stack
+                    (route) => false,
                   );
                 } catch (e) {
-                  // Remove loading indicator
                   Navigator.of(context).pop();
-
-                  // Show error message
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Error logging out: $e')),
                   );

@@ -14,12 +14,16 @@ class _SignUpPageState extends State<SignUpPage> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  String? _selectedSex;
   bool _isLoading = false;
   String? _errorMessage;
+
+  final List<String> _sexOptions = ['Male', 'Female'];
 
   Future<void> _signUp() async {
     if (_firstNameController.text.isEmpty ||
         _lastNameController.text.isEmpty ||
+        _selectedSex == null ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty) {
       setState(() {
@@ -38,6 +42,7 @@ class _SignUpPageState extends State<SignUpPage> {
         'first_name': _firstNameController.text.trim(),
         'middle_name': _middleNameController.text.trim(),
         'last_name': _lastNameController.text.trim(),
+        'sex': _selectedSex,
         'username': _emailController.text.split('@')[0],
       };
 
@@ -49,7 +54,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
       if (response.user != null) {
         if (mounted) {
-          Navigator.pushNamed(context, '/verification');
+          Navigator.pushNamed(context, '/confirmation');
         }
       }
     } catch (e) {
@@ -119,25 +124,27 @@ class _SignUpPageState extends State<SignUpPage> {
                               ),
                             ),
                           _buildTextField(
-                            'First name', 
+                            'First name',
                             'Enter first name',
                             controller: _firstNameController,
                           ),
                           const SizedBox(height: 15),
                           _buildTextField(
-                            'Middle name', 
+                            'Middle name',
                             'Enter middle name',
                             controller: _middleNameController,
                           ),
                           const SizedBox(height: 15),
                           _buildTextField(
-                            'Last name', 
+                            'Last name',
                             'Enter last name',
                             controller: _lastNameController,
                           ),
                           const SizedBox(height: 15),
+                          _buildSexDropdown(),
+                          const SizedBox(height: 15),
                           _buildTextField(
-                            'Email', 
+                            'Email',
                             'Enter email',
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
@@ -163,23 +170,24 @@ class _SignUpPageState extends State<SignUpPage> {
                                   borderRadius: BorderRadius.circular(5),
                                 ),
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
+                              child:
+                                  _isLoading
+                                      ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : const Text(
+                                        'Sign up',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    )
-                                  : const Text(
-                                      'Sign up',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -207,7 +215,7 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Widget _buildTextField(
-    String label, 
+    String label,
     String hint, {
     TextEditingController? controller,
     bool isPassword = false,
@@ -238,6 +246,53 @@ class _SignUpPageState extends State<SignUpPage> {
               horizontal: 15,
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSexDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Sex',
+          style: TextStyle(fontSize: 16, color: Colors.black87),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: _selectedSex,
+          decoration: InputDecoration(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(5),
+              borderSide: BorderSide.none,
+            ),
+            filled: true,
+            fillColor: Colors.grey[100],
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 0,
+              horizontal: 15,
+            ),
+          ),
+          hint: const Text('Select sex'),
+          items:
+              _sexOptions.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+          onChanged: (newValue) {
+            setState(() {
+              _selectedSex = newValue;
+            });
+          },
+          validator: (value) {
+            if (value == null) {
+              return 'Please select your sex';
+            }
+            return null;
+          },
         ),
       ],
     );

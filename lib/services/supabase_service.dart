@@ -45,6 +45,7 @@ class SupabaseService {
           'middle_name': userData['middle_name'] ?? null,
           'last_name': userData['last_name'],
           'username': userData['username'] ?? email.split('@')[0],
+          'sex': userData['sex'],
         };
 
         print("Inserting patient data: $patientData");

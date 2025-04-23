@@ -7,7 +7,6 @@ import 'signup_page.dart';
 import 'verification_page.dart';
 import 'prescription_page.dart';
 import 'profile.dart';
-import 'create_appointment_page.dart';
 import 'appointment.dart';
 
 void main() async {
@@ -43,12 +42,11 @@ class IntimaCareApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
-        '/verification': (context) => const VerificationPage(),
+        '/confirmation': (context) => const ConfirmationMessagePage(),
         '/home': (context) => const HomePage(),
         '/appointment': (context) => const AppointmentPage(),
         '/prescription': (context) => const PrescriptionPage(),
         '/profile': (context) => const ProfilePage(),
-        '/create_appointment': (context) => const CreateAppointmentPage(),
       },
     );
   }

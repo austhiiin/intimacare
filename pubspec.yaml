@@ -28,18 +28,19 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  supabase_flutter: ^1.10.25  # check for the latest version on pub.dev
+  supabase_flutter: ^1.10.25 # check for the latest version on pub.dev
   flutter_dotenv: ^5.1.0
   intl: ^0.18.1
+  lottie: 2.7.0
   flutter:
     sdk: flutter
-  
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
+  flutter_launcher_icons: ^0.13.1  # Use the latest version
   flutter_test:
     sdk: flutter
 
@@ -54,6 +55,13 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/intimacare_icon.png"  # Path to your icon image file
+  adaptive_icon_background: "#FFFFFF"  # For Android adaptive icons
+  adaptive_icon_foreground: "assets/icons/intimacare_icon_foreground.png"  # For Android adaptive icons
+
 flutter:
   uses-material-design: true
 
@@ -64,6 +72,10 @@ flutter:
     - assets/fonts/Open_Sans/static/OpenSans-Light.ttf
     - assets/fonts/Open_Sans/static/OpenSans-SemiBold.ttf
     - .env
+    - assets/images/female.png
+    - assets/images/male.png
+    - assets/animations/email_animation.json
+    - assets/animations/medication.json
 
   fonts:
     - family: OpenSans

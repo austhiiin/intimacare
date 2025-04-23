@@ -1,8 +1,8 @@
-// appointment.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intimacare_client/prescription_page.dart';
 import 'package:intimacare_client/home.dart';
+import 'package:intimacare_client/profile.dart';
 
 class AppointmentPage extends StatefulWidget {
   const AppointmentPage({super.key});
@@ -31,9 +31,46 @@ class _AppointmentPageState extends State<AppointmentPage> {
   TimeOfDay? selectedTime;
   bool isLoading = false;
   String notesText = '';
+  String _userSex = 'female';
+  bool _isLoading = false;
 
   // Controller for notes text field
   final notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final response = await Supabase.instance.client
+            .from('patient')
+            .select('sex')
+            .eq('patient_id', user.id)
+            .single();
+
+        if (response != null) {
+          setState(() {
+            _userSex = response['sex']?.toLowerCase() ?? 'female';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -44,255 +81,257 @@ class _AppointmentPageState extends State<AppointmentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color.fromARGB(255, 245, 245, 245),
       body: SafeArea(
         child: Column(
           children: [
-            // Top section with profile icon and IntimaCare title
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            _buildAppBar(),
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.red),
+                    )
+                  : _buildMainContent(),
+            ),
+            _buildBottomNavigation(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Expanded(
+            child: Text(
+              'IntimaCare',
+              style: TextStyle(
+                fontSize: 36,
+                fontWeight: FontWeight.w800,
+                color: Color.fromARGB(255, 197, 0, 0),
+              ),
+            ),
+          ),
+          ProfileIconWithDropdown(userSex: _userSex),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Set Appointment',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              color: Colors.red,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Patient Type
+          _buildLabelText('Type of Patient'),
+          const SizedBox(height: 8),
+          _buildDropdown(
+            value: selectedPatientType,
+            items: patientTypes,
+            hint: 'Select type of Patient',
+            onChanged: (value) {
+              setState(() {
+                selectedPatientType = value;
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Purpose
+          _buildLabelText('Purpose'),
+          const SizedBox(height: 8),
+          _buildDropdown(
+            value: selectedPurpose,
+            items: appointmentPurposes,
+            hint: 'Select purpose of appointment',
+            onChanged: (value) {
+              setState(() {
+                selectedPurpose = value;
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+
+          // Date picker
+          _buildLabelText('Date'),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => _selectDate(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'IntimaCare',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800, // ExtraBold variant
-                        color: Color.fromARGB(255, 197, 0, 0), // Red color
-                      ),
+                  Text(
+                    selectedDate == null
+                        ? 'Select date'
+                        : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                    style: TextStyle(
+                      color: selectedDate == null ? Colors.grey[600] : Colors.black,
                     ),
                   ),
-                  // Profile icon
-                  const ProfileIconWithDropdown(),
+                  const Icon(Icons.calendar_today, color: Colors.red),
                 ],
               ),
             ),
+          ),
+          const SizedBox(height: 20),
 
-            // Content section
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          // Time picker
+          _buildLabelText('Time'),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => _selectTime(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 15,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    selectedTime == null
+                        ? 'Select time'
+                        : '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')} ${selectedTime!.period.name.toUpperCase()}',
+                    style: TextStyle(
+                      color: selectedTime == null ? Colors.grey[600] : Colors.black,
+                    ),
+                  ),
+                  const Icon(Icons.access_time, color: Colors.red),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          // Notes
+          _buildLabelText('Notes (Optional)'),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: notesController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Add any additional information',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.all(15),
+              ),
+              onChanged: (value) {
+                notesText = value;
+              },
+            ),
+          ),
+          const SizedBox(height: 30),
+
+          // Submit button
+          Center(
+            child: Container(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : _saveAppointment,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 3,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.calendar_today, color: Colors.white),
+                    const SizedBox(width: 10),
                     const Text(
                       'Set Appointment',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Patient Type
-                    _buildLabelText('Type of Patient'),
-                    const SizedBox(height: 8),
-                    _buildDropdown(
-                      value: selectedPatientType,
-                      items: patientTypes,
-                      hint: 'Select type of Patient',
-                      onChanged: (value) {
-                        setState(() {
-                          selectedPatientType = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Purpose
-                    _buildLabelText('Purpose'),
-                    const SizedBox(height: 8),
-                    _buildDropdown(
-                      value: selectedPurpose,
-                      items: appointmentPurposes,
-                      hint: 'Select purpose of appointment',
-                      onChanged: (value) {
-                        setState(() {
-                          selectedPurpose = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Date picker
-                    _buildLabelText('Date'),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => _selectDate(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 15,
-                          vertical: 15,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              selectedDate == null
-                                  ? 'Select date'
-                                  : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
-                              style: TextStyle(
-                                color:
-                                    selectedDate == null
-                                        ? Colors.grey[600]
-                                        : Colors.black,
-                              ),
-                            ),
-                            const Icon(Icons.calendar_today, color: Colors.red),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Time picker
-                    _buildLabelText('Time'),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => _selectTime(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 15,
-                          vertical: 15,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              selectedTime == null
-                                  ? 'Select time'
-                                  : '${selectedTime!.hour}:${selectedTime!.minute.toString().padLeft(2, '0')} ${selectedTime!.period.name}',
-                              style: TextStyle(
-                                color:
-                                    selectedTime == null
-                                        ? Colors.grey[600]
-                                        : Colors.black,
-                              ),
-                            ),
-                            const Icon(Icons.access_time, color: Colors.red),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Notes
-                    _buildLabelText('Notes (Optional)'),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: TextField(
-                        controller: notesController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: 'Add any additional information',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.all(15),
-                        ),
-                        onChanged: (value) {
-                          notesText = value;
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Submit button
-                    Center(
-                      child: SizedBox(
-                        width: 200,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : _saveAppointment,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(5),
-                            ),
-                          ),
-                          child:
-                              isLoading
-                                  ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                  : const Text(
-                                    'Submit',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
-            // Bottom navigation
-            Container(
-              height: 60,
-              color: Colors.white,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(
-                    Icons.calendar_today,
-                    'Appointment',
-                    isSelected: true,
-                    onTap: () {
-                      // No navigation needed as we're already on this page
-                    },
-                  ),
-                  _buildNavItem(
-                    Icons.home,
-                    'Home',
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const HomePage(),
-                        ),
-                      );
-                    },
-                  ),
-                  _buildNavItem(
-                    Icons.description,
-                    'Prescription',
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PrescriptionPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -330,40 +369,24 @@ class _AppointmentPageState extends State<AppointmentPage> {
         selectedTime!.minute,
       );
 
-      // Debug prints to help troubleshoot
-      print('Attempting to save appointment with data:');
-      print('Patient_ID: ${user.id}');
-      print('Appointment_Date: ${appointmentDateTime.toIso8601String()}');
-      print('Type_of_Patient: $selectedPatientType');
-      print('Purpose: $selectedPurpose');
-      print('Notes: ${notesText.isNotEmpty ? notesText : "null"}');
-
       // Insert appointment into database
-      final response = await Supabase.instance.client
-          .from(
-            'appointment',
-          ) // Make sure table name matches your database exactly
-          .insert({
-            'patient_id': user.id,
-            'appointment_date': appointmentDateTime.toIso8601String(),
-            'type_of_patient': selectedPatientType,
-            'purpose': selectedPurpose,
-            'notes': notesText.isNotEmpty ? notesText : null,
-          });
-
-      print('Appointment saved successfully!');
-      print('Response data: $response');
+      await Supabase.instance.client.from('appointment').insert({
+        'patient_id': user.id,
+        'appointment_date': appointmentDateTime.toIso8601String(),
+        'type_of_patient': selectedPatientType,
+        'purpose': selectedPurpose,
+        'notes': notesText.isNotEmpty ? notesText : null,
+      });
 
       // Show success dialog
       if (mounted) {
         _showAppointmentConfirmationDialog(context);
       }
     } catch (e) {
-      print('Error saving appointment: $e');
+      debugPrint('Error saving appointment: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
     } finally {
       if (mounted) {
@@ -377,7 +400,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
   Widget _buildLabelText(String label) {
     return Text(
       label,
-      style: const TextStyle(fontSize: 16, color: Colors.black87),
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
     );
   }
 
@@ -391,17 +414,24 @@ class _AppointmentPageState extends State<AppointmentPage> {
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: DropdownButton<String>(
         value: value,
         hint: Text(hint),
         isExpanded: true,
         underline: Container(),
-        items:
-            items.map((String item) {
-              return DropdownMenuItem<String>(value: item, child: Text(item));
-            }).toList(),
+        items: items.map((String item) {
+          return DropdownMenuItem<String>(value: item, child: Text(item));
+        }).toList(),
         onChanged: onChanged,
       ),
     );
@@ -410,8 +440,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
   Future<void> _selectDate(BuildContext context) async {
     // Restrict to workdays (Monday - Friday)
     bool isWeekend(DateTime date) {
-      return date.weekday == DateTime.saturday ||
-          date.weekday == DateTime.sunday;
+      return date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
     }
 
     // Get current date
@@ -436,8 +465,15 @@ class _AppointmentPageState extends State<AppointmentPage> {
       lastDate: DateTime(now.year + 1, now.month, now.day),
       selectableDayPredicate: (DateTime date) {
         // Allow only workdays (Monday to Friday)
-        return date.weekday != DateTime.saturday &&
-            date.weekday != DateTime.sunday;
+        return date.weekday != DateTime.saturday && date.weekday != DateTime.sunday;
+      },
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: Colors.red),
+          ),
+          child: child!,
+        );
       },
     );
 
@@ -463,8 +499,7 @@ class _AppointmentPageState extends State<AppointmentPage> {
     const TimeOfDay clinicCloses = TimeOfDay(hour: 17, minute: 0);
 
     // Check if selected date is today
-    final bool isToday =
-        selectedDate!.day == DateTime.now().day &&
+    final bool isToday = selectedDate!.day == DateTime.now().day &&
         selectedDate!.month == DateTime.now().month &&
         selectedDate!.year == DateTime.now().year;
 
@@ -474,10 +509,9 @@ class _AppointmentPageState extends State<AppointmentPage> {
 
     if (isToday) {
       // If today, start from next available hour
-      initialTime =
-          now.hour < clinicOpens.hour
-              ? clinicOpens
-              : TimeOfDay(hour: now.hour + 1, minute: 0);
+      initialTime = now.hour < clinicOpens.hour
+          ? clinicOpens
+          : TimeOfDay(hour: now.hour + 1, minute: 0);
 
       // For today, restrict times to clinic hours and future times
       timeConstraint = (TimeOfDay time) {
@@ -557,6 +591,10 @@ class _AppointmentPageState extends State<AppointmentPage> {
             ],
           ),
           actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -582,47 +620,73 @@ class _AppointmentPageState extends State<AppointmentPage> {
     );
   }
 
+  Widget _buildBottomNavigation() {
+    return Container(
+      height: 65,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, -1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildNavItem(
+            Icons.calendar_today,
+            'Appointment',
+            isSelected: true,
+            onTap: () {
+              // Already on appointment page
+            },
+          ),
+          _buildNavItem(
+            Icons.home,
+            'Home',
+            onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+          ),
+          _buildNavItem(
+            Icons.description,
+            'Prescription',
+            onTap: () => Navigator.pushReplacementNamed(context, '/prescription'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNavItem(
     IconData icon,
     String label, {
     bool isSelected = false,
-    VoidCallback? onTap,
+    required VoidCallback onTap,
   }) {
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
-        child: MouseRegion(
-          onEnter: (_) {},
-          onExit: (_) {},
-          child: TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 200),
-            tween: Tween(begin: 1.0, end: isSelected ? 1.2 : 1.0),
-            builder: (context, scale, child) {
-              return AnimatedScale(
-                scale: scale,
-                duration: const Duration(milliseconds: 200),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      icon,
-                      color: Colors.red, // Red color for the icons
-                      size: isSelected ? 30 : 24, // Bigger icon when selected
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: Colors.red, // Red color for the label
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.red : Colors.grey,
+              size: isSelected ? 28 : 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.red : Colors.grey,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -630,60 +694,99 @@ class _AppointmentPageState extends State<AppointmentPage> {
 }
 
 class ProfileIconWithDropdown extends StatelessWidget {
-  const ProfileIconWithDropdown({super.key});
+  final String userSex;
+
+  const ProfileIconWithDropdown({
+    super.key,
+    required this.userSex,
+  });
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
       offset: const Offset(0, 40),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      itemBuilder:
-          (BuildContext context) => <PopupMenuEntry<String>>[
-            const PopupMenuItem<String>(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline, color: Colors.red),
-                  SizedBox(width: 10),
-                  Text('Profile'),
-                ],
-              ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem<String>(
-              value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, color: Colors.red),
-                  SizedBox(width: 10),
-                  Text('Logout'),
-                ],
-              ),
-            ),
-          ],
-      onSelected: (String value) async {
-        if (value == 'profile') {
-          // Navigate to profile page
-          Navigator.pushNamed(context, '/profile');
-        } else if (value == 'logout') {
-          // Show logout confirmation dialog
-          await _showLogoutConfirmationDialog(context);
-        }
-      },
-      child: Container(
+      icon: Container(
         height: 40,
         width: 40,
-        decoration: const BoxDecoration(
-          color: Color.fromARGB(255, 245, 245, 245),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.menu, color: Color.fromARGB(255, 0, 0, 0)),
+        child: ClipOval(
+          child: Image.asset(
+            'assets/images/$userSex.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Center(
+                child: Icon(
+                  Icons.person_outline,
+                  size: 20,
+                  color: Colors.red,
+                ),
+              );
+            },
+          ),
+        ),
       ),
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: 'profile',
+          child: Row(
+            children: [
+              Container(
+                height: 24,
+                width: 24,
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/$userSex.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        Icons.person_outline,
+                        size: 16,
+                        color: Colors.red,
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text('My Profile'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Row(
+            children: [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 10),
+              Text('Logout'),
+            ],
+          ),
+        ),
+      ],
+      onSelected: (String value) {
+        if (value == 'profile') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ProfilePage()),
+          );
+        } else if (value == 'logout') {
+          _showLogoutConfirmationDialog(context);
+        }
+      },
     );
   }
 
-  Future<void> _showLogoutConfirmationDialog(BuildContext context) async {
-    return showDialog(
+  void _showLogoutConfirmationDialog(BuildContext context) {
+    showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -691,16 +794,12 @@ class ProfileIconWithDropdown extends StatelessWidget {
           content: const Text('Are you sure you want to logout?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: const Text('No', style: TextStyle(color: Colors.grey)),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () async {
-                Navigator.of(context).pop(); // Close the dialog
-
-                // Show loading indicator
+                Navigator.of(context).pop();
                 showDialog(
                   context: context,
                   barrierDismissible: false,
@@ -710,31 +809,25 @@ class ProfileIconWithDropdown extends StatelessWidget {
                     );
                   },
                 );
-
                 try {
-                  // Sign out from Supabase
                   await Supabase.instance.client.auth.signOut();
-
-                  // Dismiss loading dialog
                   Navigator.of(context).pop();
-
-                  // Navigate to login page
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     '/login',
-                    (route) => false, // Remove all routes from stack
+                    (route) => false,
                   );
                 } catch (e) {
-                  // Dismiss loading dialog
                   Navigator.of(context).pop();
-
-                  // Show error message
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error signing out: $e')),
+                    SnackBar(content: Text('Error logging out: $e')),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Yes', style: TextStyle(color: Colors.white)),
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
           shape: RoundedRectangleBorder(
